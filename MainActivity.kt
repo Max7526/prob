@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gpsButton: Button
     private lateinit var errorText: TextView
     private lateinit var weatherApiService: WeatherApiService
+    private var isLocationRequestInProgress = false
 
     // Инициализация requestPermissionLauncher
     private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -42,6 +43,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             Toast.makeText(this, "Разрешение на доступ к геолокации не получено", Toast.LENGTH_SHORT).show()
             errorText.text = "Ошибка: Разрешение на доступ к геолокации не получено"
+            resetLocationRequestState()
         }
     }
 
@@ -69,9 +71,17 @@ class MainActivity : AppCompatActivity() {
         weatherApiService = retrofit.create(WeatherApiService::class.java)
 
         gpsButton.setOnClickListener {
+            if (isLocationRequestInProgress) {
+                Toast.makeText(this, "Запрос уже выполняется", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             try {
+                isLocationRequestInProgress = true
+                gpsButton.isEnabled = false
                 checkLocationPermission()
             } catch (e: Exception) {
+                resetLocationRequestState()
                 Log.e("MainActivity", "Error in checkLocationPermission: ${e.message}")
                 errorText.text = "Ошибка: ${e.message}"
             }
@@ -94,6 +104,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e("MainActivity", "Error in checkLocationPermission: ${e.message}")
             errorText.text = "Ошибка: ${e.message}"
+            resetLocationRequestState()
         }
     }
 
@@ -105,15 +116,18 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Toast.makeText(this, "Не удалось определить местоположение", Toast.LENGTH_SHORT).show()
                 errorText.text = "Ошибка: Не удалось определить местоположение"
+                resetLocationRequestState()
             }
         } catch (e: SecurityException) {
             // Обрабатываем ошибку, если разрешение на геолокацию не было предоставлено
             Toast.makeText(this, "Ошибка доступа к геолокации: ${e.message}", Toast.LENGTH_LONG).show()
             errorText.text = "Ошибка: ${e.message}"
             Log.e("LocationError", "SecurityException: ${e.message}")
+            resetLocationRequestState()
         } catch (e: Exception) {
             Log.e("MainActivity", "Error in getWeatherForCurrentLocation: ${e.message}")
             errorText.text = "Ошибка: ${e.message}"
+            resetLocationRequestState()
         }
     }
 
@@ -127,11 +141,13 @@ class MainActivity : AppCompatActivity() {
                 return location?.let { "${it.latitude},${it.longitude}" }
             } else {
                 errorText.text = "Ошибка: Разрешение на геолокацию не предоставлено"
+                resetLocationRequestState()
                 return null
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error in getCurrentLocation: ${e.message}")
             errorText.text = "Ошибка: ${e.message}"
+            resetLocationRequestState()
             return null
         }
     }
@@ -167,17 +183,25 @@ class MainActivity : AppCompatActivity() {
                         errorText.text = "Ошибка: ${response.code()} - ${response.message()}"
                         Log.e("WeatherAPI", "Response error: ${response.message()}")
                     }
+                    resetLocationRequestState()
                 }
 
                 override fun onFailure(call: Call<Weather>, t: Throwable) {
                     errorText.text = "Ошибка при загрузке данных: ${t.message}"
                     Log.e("WeatherAPI", "Failure: ${t.message}")
+                    resetLocationRequestState()
                 }
             })
         } catch (e: Exception) {
             Log.e("MainActivity", "Error in fetchWeatherData: ${e.message}")
             errorText.text = "Ошибка: ${e.message}"
+            resetLocationRequestState()
         }
+    }
+
+    private fun resetLocationRequestState() {
+        isLocationRequestInProgress = false
+        gpsButton.isEnabled = true
     }
 
     // Парсинг восхода и заката
