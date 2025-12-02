@@ -1,0 +1,2 @@
+rootProject.name = "MovieBox"
+include(":app")
